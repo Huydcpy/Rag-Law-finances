@@ -3,7 +3,10 @@ import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
+
+from src.engine.generation.engine import get_rag_engine 
 
 app = FastAPI(title="RAG Law & Finance API")
 
@@ -18,21 +21,61 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     message: str
 
-async def generate_rag_response(query: str):
-    # Trả về metadata trích dẫn trước cho UI Sidebar
-    sources = [
-        {"file_name": "Luat_Doanh_Nghiep_2020.pdf", "page": 12, "section": "Điều 4", "text": "Doanh nghiệp là tổ chức có tên riêng, có tài sản..."},
-        {"file_name": "BCTC_Vinamilk_Q2.pdf", "page": 5, "section": "KQKD", "text": "Lợi nhuận sau thuế hợp nhất đạt 2,000 tỷ đồng..."}
-    ]
-    yield f"data: {json.dumps({'type': 'sources', 'data': sources})}\n\n"
-    await asyncio.sleep(0.05)
+# Khởi tạo RAG Engine
+rag_engine = get_rag_engine()
 
-    # Stream nội dung câu trả lời từng từ mượt mà
-    response_text = f"Trả lời cho câu hỏi '{query}': Căn cứ theo quy định pháp luật và BCTC công bố..."
-    for word in response_text.split(" "):
-        yield f"data: {json.dumps({'type': 'content', 'data': word + ' '})}\n\n"
-        await asyncio.sleep(0.03)
+async def generate_rag_response(query: str):
+    try:
+        # 1. Gọi Engine an toàn bằng Async (tránh treo Event Loop)
+        if hasattr(rag_engine, "aquery"):
+            response_obj = await rag_engine.aquery(query)
+        else:
+            # Chạy hàm sync ở một thread riêng
+            response_obj = await run_in_threadpool(rag_engine.query, query)
+        
+        # 2. Bóc tách Nguồn trích dẫn (Source Nodes)
+        sources = []
+        if hasattr(response_obj, "source_nodes") and response_obj.source_nodes:
+            for node in response_obj.source_nodes:
+                metadata = node.node.metadata or {}
+                sources.append({
+                    "file_name": metadata.get("file_name", "Tài liệu"),
+                    "page": metadata.get("page_label", metadata.get("page", 1)),
+                    "section": metadata.get("section", "Trích đoạn"),
+                    "text": node.node.get_content()[:200] + "..." # Preview ngắn
+                })
+        
+        # Gửi Nguồn trích dẫn sang Streamlit UI trước
+        yield f"data: {json.dumps({'type': 'sources', 'data': sources}, ensure_ascii=False)}\n\n"
+        await asyncio.sleep(0.01)
+
+        # 3. Stream nội dung trả lời từ LLM
+        if hasattr(response_obj, "async_response_gen"):
+            # Nếu LlamaIndex hỗ trợ Async Streaming
+            async for token in response_obj.async_response_gen:
+                yield f"data: {json.dumps({'type': 'content', 'data': token}, ensure_ascii=False)}\n\n"
+                await asyncio.sleep(0.001)
+        elif hasattr(response_obj, "response_gen"):
+            # Nếu là Sync Generator tiêu chuẩn
+            for token in response_obj.response_gen:
+                yield f"data: {json.dumps({'type': 'content', 'data': token}, ensure_ascii=False)}\n\n"
+                await asyncio.sleep(0.001)
+        else:
+            # Nếu trả về văn bản hoàn chỉnh
+            full_text = str(response_obj)
+            for word in full_text.split(" "):
+                yield f"data: {json.dumps({'type': 'content', 'data': word + ' '}, ensure_ascii=False)}\n\n"
+                await asyncio.sleep(0.01)
+                
+    except Exception as e:
+        # Bắt lỗi và đẩy thông báo lỗi về client dưới dạng SSE
+        error_msg = f"Lỗi hệ thống RAG: {str(e)}"
+        yield f"data: {json.dumps({'type': 'error', 'data': error_msg}, ensure_ascii=False)}\n\n"
 
 @app.post("/chat/stream")
 async def chat_stream(request: ChatRequest):
-    return StreamingResponse(generate_rag_response(request.message), media_type="text/event-stream")
+    return StreamingResponse(
+        generate_rag_response(request.message), 
+        media_type="text/event-stream"
+    )
+
