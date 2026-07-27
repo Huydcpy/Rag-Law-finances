@@ -1,3 +1,8 @@
+import sys
+from pathlib import Path
+
+# Thêm thư mục gốc của project vào sys.path
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 import json
 import asyncio
 import logging
