@@ -16,7 +16,7 @@ test:
 	pytest -v tests/
 
 run-api:
-	uvicorn src.api.routes:app --reload --host 0.0.0.0 --port 8000
+	uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
 
 run-ui:
 	streamlit run src/ui/app.py

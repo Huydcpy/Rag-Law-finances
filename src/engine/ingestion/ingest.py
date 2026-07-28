@@ -10,10 +10,12 @@ from llama_index.core import VectorStoreIndex
 
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
+from src.configs.settings import CHROMA_PERSIST_DIR
+
 nodes = split_documents(documents)
 
 client = chromadb.PersistentClient(
-    path="data/chroma_db"
+    path=CHROMA_PERSIST_DIR
 )
 
 collection = client.get_or_create_collection(

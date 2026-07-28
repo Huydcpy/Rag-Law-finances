@@ -1,6 +1,8 @@
 from llama_index.llms.ollama import Ollama
 
+from src.configs.settings import LLM_MODEL_NAME, OLLAMA_BASE_URL
+
 llm = Ollama(
-    model="qwen2.5:7b",
-    base_url="http://localhost:11434",
+    model=LLM_MODEL_NAME,
+    base_url=OLLAMA_BASE_URL,
 )

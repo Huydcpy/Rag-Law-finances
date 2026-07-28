@@ -1,7 +1,7 @@
 from llama_index.core.node_parser import SentenceSplitter
 
-CHUNK_SIZE = 1000
-CHUNK_OVERLAP = 200
+from src.configs.settings import CHUNK_SIZE, CHUNK_OVERLAP
+
 
 def split_documents(documents):
     splitter = SentenceSplitter(

@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
-from src.engine.generation.engine import get_rag_engine 
+from src.engine.generation.engine import get_rag_engine
 
 app = FastAPI(title="RAG Law & Finance API")
 
@@ -21,17 +21,21 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     message: str
 
-# Khởi tạo RAG Engine
-rag_engine = get_rag_engine()
+rag_engine = None
+
+def ensure_engine():
+    global rag_engine
+    if rag_engine is None:
+        rag_engine = get_rag_engine()
+    return rag_engine
 
 async def generate_rag_response(query: str):
     try:
-        # 1. Gọi Engine an toàn bằng Async (tránh treo Event Loop)
-        if hasattr(rag_engine, "aquery"):
-            response_obj = await rag_engine.aquery(query)
+        engine = ensure_engine()
+        if hasattr(engine, "aquery"):
+            response_obj = await engine.aquery(query)
         else:
-            # Chạy hàm sync ở một thread riêng
-            response_obj = await run_in_threadpool(rag_engine.query, query)
+            response_obj = await run_in_threadpool(engine.query, query)
         
         # 2. Bóc tách Nguồn trích dẫn (Source Nodes)
         sources = []

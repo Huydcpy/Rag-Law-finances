@@ -3,8 +3,10 @@ import chromadb
 from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.core import VectorStoreIndex
 
+from src.configs.settings import CHROMA_PERSIST_DIR, TOP_K
+
 client = chromadb.PersistentClient(
-    path="data/chroma_db"
+    path=CHROMA_PERSIST_DIR
 )
 
 collection = client.get_collection(
@@ -20,5 +22,5 @@ index = VectorStoreIndex.from_vector_store(
 )
 
 retriever = index.as_retriever(
-    similarity_top_k=5
+    similarity_top_k=TOP_K
 )
