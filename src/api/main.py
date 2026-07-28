@@ -32,12 +32,12 @@ def ensure_engine():
 async def generate_rag_response(query: str):
     try:
         engine = ensure_engine()
-        if hasattr(engine, "aquery"):
-            response_obj = await engine.aquery(query)
-        else:
-            response_obj = await run_in_threadpool(engine.query, query)
-        
-        # 2. Bóc tách Nguồn trích dẫn (Source Nodes)
+
+        def run_query():
+            return engine.query(query)
+
+        response_obj = await run_in_threadpool(run_query)
+
         sources = []
         if hasattr(response_obj, "source_nodes") and response_obj.source_nodes:
             for node in response_obj.source_nodes:
@@ -46,33 +46,23 @@ async def generate_rag_response(query: str):
                     "file_name": metadata.get("file_name", "Tài liệu"),
                     "page": metadata.get("page_label", metadata.get("page", 1)),
                     "section": metadata.get("section", "Trích đoạn"),
-                    "text": node.node.get_content()[:200] + "..." # Preview ngắn
+                    "text": node.node.get_content()[:200] + "..."
                 })
-        
-        # Gửi Nguồn trích dẫn sang Streamlit UI trước
+
         yield f"data: {json.dumps({'type': 'sources', 'data': sources}, ensure_ascii=False)}\n\n"
         await asyncio.sleep(0.01)
 
-        # 3. Stream nội dung trả lời từ LLM
-        if hasattr(response_obj, "async_response_gen"):
-            # Nếu LlamaIndex hỗ trợ Async Streaming
-            async for token in response_obj.async_response_gen:
-                yield f"data: {json.dumps({'type': 'content', 'data': token}, ensure_ascii=False)}\n\n"
-                await asyncio.sleep(0.001)
-        elif hasattr(response_obj, "response_gen"):
-            # Nếu là Sync Generator tiêu chuẩn
+        if hasattr(response_obj, "response_gen"):
             for token in response_obj.response_gen:
                 yield f"data: {json.dumps({'type': 'content', 'data': token}, ensure_ascii=False)}\n\n"
                 await asyncio.sleep(0.001)
         else:
-            # Nếu trả về văn bản hoàn chỉnh
             full_text = str(response_obj)
             for word in full_text.split(" "):
                 yield f"data: {json.dumps({'type': 'content', 'data': word + ' '}, ensure_ascii=False)}\n\n"
                 await asyncio.sleep(0.01)
-                
+
     except Exception as e:
-        # Bắt lỗi và đẩy thông báo lỗi về client dưới dạng SSE
         error_msg = f"Lỗi hệ thống RAG: {str(e)}"
         yield f"data: {json.dumps({'type': 'error', 'data': error_msg}, ensure_ascii=False)}\n\n"
 

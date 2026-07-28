@@ -1,10 +1,11 @@
 from src.configs.settings import CHROMA_PERSIST_DIR, LLM_MODEL_NAME, OLLAMA_BASE_URL, TOP_K
+from src.configs.prompts import SYSTEM_PROMPT
 from src.engine.embedding.embedder import get_embed_model
 
 
 def get_rag_engine():
     import chromadb
-    from llama_index.core import VectorStoreIndex, Settings
+    from llama_index.core import VectorStoreIndex, Settings, PromptTemplate
     from llama_index.llms.ollama import Ollama
     from llama_index.vector_stores.chroma import ChromaVectorStore
 
@@ -26,9 +27,16 @@ def get_rag_engine():
         embed_model=embed_model,
     )
 
+    text_qa_template = PromptTemplate(
+        SYSTEM_PROMPT
+        + "\n\nContext:\n{context_str}\n\nQuery: {query_str}\nAnswer:"
+    )
+
     query_engine = index.as_query_engine(
         llm=llm,
         similarity_top_k=TOP_K,
+        streaming=True,
+        text_qa_template=text_qa_template,
     )
 
     return query_engine
