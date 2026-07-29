@@ -12,10 +12,8 @@ virtualenv/
 .conda/
 
 data/raw/*
-data/processed/*
 data/chroma_db/
 !data/raw/.gitkeep
-!data/processed/.gitkeep
 
 .chroma_db/
 
