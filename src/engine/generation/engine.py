@@ -14,7 +14,9 @@ def get_rag_engine():
     llm = Ollama(
         model=LLM_MODEL_NAME,
         base_url=OLLAMA_BASE_URL,
+        context_window=4096,
         request_timeout=600.0,
+        keep_alive="30m",
     )
     Settings.llm = llm
 

@@ -20,8 +20,8 @@ python3 -m venv .venv
 source .venv/bin/activate
 make install
 
-# 3. Copy env
-cp .env.example .env
+# 3. Cấu hình env (file `.env` đã có sẵn trong repo, chỉnh lại nếu cần)
+#    OLLAMA_BASE_URL, LLM_MODEL_NAME, EMBEDDING_MODEL_NAME, CHROMA_PERSIST_DIR...
 
 # 4. Pull model LLM
 ollama pull qwen2.5:7b
@@ -36,18 +36,27 @@ python3 -m src.engine.ingestion.ingest
 # 1. Kích hoạt môi trường
 source .venv/bin/activate
 
-# 2. Khởi động Ollama (server local LLM)
+# 2. Cài dependencies (CHỈ CẦN CHẠY NẾU lỗi "No module named ..."
+#    hoặc mới cài lại môi trường ảo)
+pip install -e .
+
+# 3. Khởi động Ollama (server local LLM)
 ollama serve
 
-# 3. (Terminal khác) Chạy API backend
+# 4. (Terminal khác) Chạy API backend
 make run-api
 
-# 4. (Terminal khác) Chạy UI
+# 5. (Terminal khác) Chạy UI
 make run-ui
 ```
 
 - API: http://localhost:8000
 - UI: http://localhost:8501
+
+> **Lưu ý quan trọng:** Nếu mở web và thấy lỗi `No module named streamlit` / `uvicorn`
+> nghĩa là dependencies chưa được cài vào môi trường ảo — hãy chạy lại bước 2
+> (`pip install -e .`). Lần chạy đầu tiên sẽ tải model embedding `BAAI/bge-m3` (~2 GB)
+> nên UI có thể chậm hơn bình thường vài phút.
 
 ## Chạy lại Ingestion (khi thêm file PDF mới vào `data/raw/`)
 
